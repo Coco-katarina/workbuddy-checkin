@@ -1,184 +1,91 @@
 # workbuddy-checkin
 
-> WorkBuddy（原 CodeBuddy）每日积分自动签到 Skill —— 全本机运行，无后端，令牌不落盘。
+> WorkBuddy（原 CodeBuddy）「Buddy 加油站」每日积分自动签到 Skill —— 接口直签、三通道授权、跨平台（Windows / macOS / Linux），零第三方依赖。
 
-每天自动领取 WorkBuddy「Buddy 加油站」的 100 积分（连续第 7 天 1000 积分），再也不怕忘记签到断连。
+核心实现来自 **totorosir-workbuddy-checkin v3.1.7**（SkillHub，@totorosir / 公众号「龙猫科技说」，已经腾讯科恩实验室与云鼎实验室双重安全审计），本仓库在其基础上做了适配性优化与进阶工具补充。
 
-## 它做了什么
+## 能做什么
 
-1. 读取本机 WorkBuddy 桌面端的登录态（v5.3.8+ 明文 JSON / 旧版 state.vscdb 自动探测）
-2. 调用腾讯官方签到接口 `copilot.tencent.com/billing/meter/daily-checkin`
-3. 幂等：今日已签到自动跳过，支持一天多时间点补签
+- **每日签到**：自动领取 100 积分（连续第 7 天 1000 积分），今日已签自动跳过（幂等）
+- **派猫猫旅行**：先领后派全自动闭环（到达自动补领、每日上限不发请求）
+- **桌面通知 + 12 渠道推送**：钉钉 / 飞书 / 企业微信 / 微信 / 邮件 / Bark / Telegram 等（可选）
+- **客户端不开也能签**：长效令牌（refreshToken）自续期，定时任务完全独立运行
 
-**不做什么**：不点 GUI 按钮（Electron `isTrusted` 过滤使模拟点击无效）、不上传令牌给第三方、不写入日志。
+## 三条授权通道（统一入口 `scripts/auto_checkin.py` 自动择一）
 
-## 最简方式：WorkBuddy 内置 Skill 目录（推荐小白）
+| 通道 | 适用场景 | 配置成本 |
+|---|---|---|
+| A · 本地登录态直签 | Windows（客户端运行中即可解密） | **零配置** |
+| B · 网页会话授权 | macOS 等无法本地解密的环境 | 一次性授权约 30 秒 |
+| C · 长效令牌自续期 | 任意平台；客户端不常开 / 独立定时任务 | 一次性录入令牌 |
 
-不需要敲命令，直接把本仓库当成本地 skill 目录，让 WorkBuddy 自己每天执行。
-
-### 1. 准备本地 skill 目录
-
-在电脑上新建一个文件夹（例如 `D:\workspace\workbuddy\签到自动任务`），把本仓库的 `SKILL.md` 复制进去。
-
-![步骤1：新建本地 skill 目录](images/step1.png)
-
-```
-签到自动任务/
-└── SKILL.md
-```
-
-### 2. 在 WorkBuddy 里新建任务
-
-打开 WorkBuddy 桌面端 → 左侧「新建任务」→ 工作目录选择刚才创建的文件夹。
-
-![步骤2：WorkBuddy 新建任务并选择目录](images/step2.png)
-
-### 3. 粘贴提示词并启动
-
-在对话里粘贴以下内容（可以直接复制）：
-
-```
-学习 SKILL.md，并实现每日签到，需要返回执行结果成功还是失败。
-```
-
-![步骤3：粘贴提示词](images/step3.png)
-
-WorkBuddy 会读取目录里的 `SKILL.md`，理解签到逻辑，并自动创建定时任务。
-
-### 4. 查看自动任务
-
-创建成功后，进入左侧「自动化」→ 即可看到「每日领取 Buddy 加油站积分」定时任务。
-
-![步骤4：在自动化列表查看任务](images/step4.png)
-
-### 5. 等它执行，看结果
-
-任务运行后，WorkBuddy 会返回类似结果：
-
-![步骤5：签到成功返回结果](images/step5.png)
-
-```
-✅ Buddy 加油站每日积分领取成功
-- 领取结果：credit=100，连续签到 streak_days=5（连续第 5 天）
-- 空闲检测：空闲 18 秒、CPU 15.1%、无媒体播放 → 通过
-- 幂等保障：若返回 code=10001（今日已签到）会自动跳过
-```
-
-> 如果当天已经手动领取过，它会返回「今日已签到，无需重复领取」，不会重复扣分/加分。
-
-## 快速开始（命令行方式）
-
-如果你更喜欢用脚本/命令行，或者想先手动验证一次：
-
-### 前提
-
-- 已安装并**登录** WorkBuddy 桌面端（[官网下载](https://www.codebuddy.cn/work/)）
-- 系统已安装 Node.js 20+（[nodejs.org](https://nodejs.org)）
-
-### Windows（PowerShell）
-
-```powershell
-# 1. 克隆仓库
-git clone https://github.com/Coco-katarina/workbuddy-checkin.git
-cd workbuddy-checkin
-
-# 2. 环境检查（验证令牌链路）
-powershell -ExecutionPolicy Bypass -File scripts\setup.ps1
-
-# 3. 立即签到
-powershell -ExecutionPolicy Bypass -File scripts\checkin.ps1
-```
-
-### macOS / Linux
+探测当前环境走哪条通道：
 
 ```bash
-# 1. 克隆仓库
-git clone https://github.com/Coco-katarina/workbuddy-checkin.git
-cd workbuddy-checkin
-
-# 2. 环境检查
-bash scripts/setup.sh
-
-# 3. 立即签到
-bash scripts/checkin.sh
+python scripts/auto_checkin.py --probe
 ```
 
-预期输出：
-- `签到成功！领取 OK credit=100 streak_days=N` → 当日领取成功
-- `今日已签到，无需重复领取` → 已领过，幂等结束
+### macOS 快速开始（通道 C，推荐）
 
-## 设置定时任务
+1. 导出一次长效令牌（客户端已登录时自动读取；加密登录态下需先解密，见下文进阶工具）：
 
-电脑非全天开机时，建议配置多个时间点补签（脚本幂等，重复运行无副作用）。推荐 `09:00 / 12:00 / 15:00 / 18:00 / 21:00` 各尝试一次。
+   ```bash
+   python scripts/rt_auth.py --export-rt --save
+   ```
 
-### Windows（任务计划程序）
+2. 验证（只读，不领取）：
 
-```powershell
-schtasks /Create /TN WorkBuddyCheckin_09 /TR "powershell -ExecutionPolicy Bypass -File C:\path\to\checkin.ps1" /SC DAILY /ST 09:00 /F
-schtasks /Create /TN WorkBuddyCheckin_12 /TR "powershell -ExecutionPolicy Bypass -File C:\path\to\checkin.ps1" /SC DAILY /ST 12:00 /F
-```
+   ```bash
+   python scripts/rt_auth.py --check
+   ```
 
-### macOS / Linux（crontab）
+3. 之后每天运行 `python scripts/rt_auth.py` 即可，令牌自动轮换回写、长期有效。
+
+### 通道 B（网页授权，一次性）
 
 ```bash
-crontab -e
-# 添加（替换实际路径）
-0 9,12,15,18,21 * * * /path/to/checkin.sh >> /path/to/logs/checkin.log 2>&1
+python scripts/web_auth.py --snippet          # 打印授权码工具与三步操作
+python scripts/web_auth.py --setup-code '<授权码>'   # 保存并校验
 ```
 
-### macOS launchd（长期后台）
+凭据只存本机 `~/.workbuddy/checkin-cred.json`（0600），输出全程脱敏。
 
-创建 `~/Library/LaunchAgents/com.user.workbuddy-checkin.plist`，`StartCalendarInterval` 用数组配置多时间点，详见 [SKILL.md](SKILL.md)。
+## 本仓库相对上游的优化
 
-## 安全说明
+| 优化 | 说明 |
+|---|---|
+| `.gitattributes` | 强制 `*.sh/*.js/*.py` 以 LF 提交（修复上游以 CRLF 打包导致 macOS/Linux 脚本无法执行的问题），`*.ps1` 保持 CRLF |
+| `tools/decrypt-token.js` | **进阶工具**：客户端 5.6.2+ 登录态为 AES-256-GCM 信封、解密密钥不落盘，本工具经 CDP（`--inspect` 短暂重启客户端，约 30 秒后自动恢复）在进程内提取 `atRestSecretKey` 并解密出 `refreshToken`，配合通道 C 实现免网页授权。含 Windows `ELECTRON_RUN_AS_NODE` 环境剥离、CDP 发现双通道（`/json/list` + 启动日志解析）、陈旧 socket 防误杀等修复 |
+| AAD 布局 | 从客户端源码逆向确认信封 AAD 公式（`WB-AAD\0` + suite/keyId/framing 结构），解密前按 `keyId = SHA256(key)[:16]` 严格校验 |
+| 文档 | 补充 macOS / 通道 C 快速开始与接口域名说明（签到走 `auth.domain`，旅行走 `www.workbuddy.cn` 且不带 `/v2`） |
 
-| 项目 | 说明 |
-|------|------|
-| 令牌存储 | 仅内存使用，管道即时消费，**不落盘、不回显、不写日志** |
-| 网络访问 | 仅 `copilot.tencent.com` 官方接口，**不访问任何第三方** |
-| 日志内容 | 仅积分 / 连续天数 / 成功失败，**绝不含令牌** |
-| 系统修改 | 只读登录态文件，**不修改 WorkBuddy 本体** |
-| 自动安装 | Electron 下载默认关闭，需显式 `WB_CHECKIN_AUTO_INSTALL_ELECTRON=1` |
+## 进阶：macOS 加密登录态导出 refreshToken（可选）
 
-> **凭据即账号密码**：解密的 `accessToken` 等同你的 WorkBuddy 账号密码。切勿将日志、脚本输出粘贴分享或提交到仓库。
+适用于不想走网页授权、愿意让客户端短暂重启一次的用户：
 
-## 文件结构
-
-```
-workbuddy-checkin/
-├── SKILL.md                      # Skill 规范文档
-├── CHANGELOG.md                  # 变更日志
-├── scripts/
-│   ├── decrypt-token.js          # 令牌读取（新版明文 Node / 旧版 Electron safeStorage）
-│   ├── checkin.sh                # macOS / Linux / Git Bash
-│   ├── checkin.ps1               # Windows PowerShell
-│   ├── setup.sh                  # macOS / Linux 环境检查
-│   └── setup.ps1                 # Windows 环境检查
-└── references/
-    └── dependencies.md           # 依赖清单与平台差异
+```bash
+node tools/decrypt-token.js
 ```
 
-## 排错速查
+成功后输出 `DECRYPT_RESULT:<refreshToken>`（请自行妥善保管，勿外传），然后：
 
-| 现象 | 原因 | 处理 |
-|------|------|------|
-| PS 解析报错（字符串缺少终止符） | 无 BOM 被 GBK 误读 | 给 ps1 加 UTF-8 BOM（本仓库已含） |
-| HTTP 401 | 令牌过期 / 读到旧版 state.vscdb | 打开 WorkBuddy 刷新登录态；确认用 v1.0.3+ |
-| 幂等场景报 PARSE_ERR | ConvertFrom-Json 解析 400 响应失败 | 加 code=10001 前置判断（本仓库已修复） |
-| 找不到登录态 | WorkBuddy 未登录 | 打开桌面端登录一次 |
-| Windows 持续 401 | 旧版只探 %APPDATA%，实际在 %LOCALAPPDATA% | 用 v1.0.3+（本仓库已修复） |
+```bash
+python scripts/rt_auth.py --setup-rt-file <令牌文件>
+```
 
-## 致谢
+> 注意：该工具需要 Node.js ≥ 18，会重启一次 WorkBuddy 客户端（约 30 秒）；完成后正常启动。若失败请改用通道 B（网页授权）。
 
-- 原作者：[cat-xierluo](https://github.com/cat-xierluo/legal-skills) —— 原始 skill v1.0.3
-- 本仓库在原版基础上做了 Windows 适配修复：
-  1. `checkin.ps1` / `setup.ps1` 添加 UTF-8 BOM（解决 PowerShell 5.1 中文 GBK 误读）
-  2. `checkin.ps1` 幂等场景 `code=10001` 前置判断（修复 ConvertFrom-Json 解析 400 响应的 PARSE_ERR bug）
+## 定时自动化
 
-## License
+推荐使用 WorkBuddy 自带自动化（每日 09:00），不要用 crontab / launchd。
 
-MIT
+## 安全约束
 
-## 免责声明
+- 令牌 / 凭据只存本机（`~/.workbuddy/checkin-rt.json` / `checkin-cred.json`，0600），任何输出脱敏
+- 只访问 WorkBuddy 官方域；写操作仅限 4 个已验证端点
+- `--export-rt` 输出的 refreshToken 等同账号钥匙，请勿提交到仓库或分享
 
-本工具等价于「每天手动点一次领取今日礼包」，仅操作本机当前登录用户自己的 WorkBuddy 账户。请勿用于他人账户、批量注册刷分或任何违反 WorkBuddy 用户协议的用途。使用者自行承担风险。
+## 致谢与来源
+
+- 上游技能：[totorosir-workbuddy-checkin](https://skillhub.cn/skills/user_3a370331/totorosir-workbuddy-checkin)（SkillHub，作者 totorosir），版权归原作者所有
+- 本仓库历史版本（safeStorage / 明文登录态方案）与详细变更见 [CHANGELOG.md](CHANGELOG.md)

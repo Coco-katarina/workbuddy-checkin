@@ -1,0 +1,20 @@
+{
+  "_说明": "WorkBuddy签到助手推送配置模板。按需只保留你用得到的渠道，未配置的渠道会自动跳过（不报错）。凭据仅存本地，勿提交到 git 或外发。",
+  "_旧结构写法": "若你沿用 2.x 的扁平字段（wecom_webhook / pushplus_token / bark_url），无需改动，脚本会自动识别并与本结构按渠道合并；同渠道以本结构为准。详见 README『配置消息推送』。",
+  "enabled": true,
+  "success_notify": false,
+  "channels": {
+    "dingtalk": {"webhook": "https://oapi.dingtalk.com/robot/send?access_token=YOUR_TOKEN", "secret": "YOUR_SECRET(可选加签)"},
+    "feishu": {"webhook": "https://open.feishu.cn/open-apis/bot/v2/hook/YOUR_HOOK", "secret": "YOUR_SECRET(可选)"},
+    "wecom": {"webhook": "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=YOUR_KEY", "secret": "YOUR_SECRET(可选)"},
+    "wechat": {"pushplus_token": "YOUR_PUSHPLUS_TOKEN（微信个人号中转）"},
+    "email": {"smtp_host": "smtp.qq.com", "smtp_port": 465, "smtp_mode": "ssl", "smtp_user": "123@qq.com", "smtp_pass": "邮箱授权码(非登录密码)", "from": "123@qq.com", "to": "to@qq.com"},
+    "sms": {"url": "https://your-sms-provider.com/send", "payload_template": "{\"content\":\"{{content}}\"}", "headers": {"Authorization": "Bearer YOUR_KEY"}},
+    "qq": {"url": "https://your-qq-push-gateway/send"},
+    "slack": {"webhook_url": "https://hooks.slack.com/services/YOUR_WEBHOOK"},
+    "telegram": {"bot_token": "YOUR_BOT_TOKEN", "chat_id": "-100123456"},
+    "bark": {"server": "https://api.day.app", "device_key": "YOUR_DEVICE_KEY"},
+    "webhook": {"url": "https://your-endpoint/hook", "payload_template": "{\"title\":\"{{title}}\",\"text\":\"{{content}}\"}"},
+    "system": {}
+  }
+}
